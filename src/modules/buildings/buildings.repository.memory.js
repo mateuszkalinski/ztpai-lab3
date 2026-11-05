@@ -5,17 +5,22 @@ const DEFAULT_BUILDINGS = [
   { id: 2, name: "Budynek B - Elektrotechnika", address: "ul. Kampusowa 14, Kraków", createdAt: new Date() }
 ];
 
-function createBuildingsRepository(seed = DEFAULT_BUILDINGS) {
+// countRooms(buildingId) - podawane przez unit of work (sale są w innym repository)
+function createBuildingsRepository(seed = DEFAULT_BUILDINGS, { countRooms = async () => 0 } = {}) {
   const buildings = structuredClone(seed);
   let nextId = Math.max(0, ...buildings.map(b => b.id)) + 1;
 
+  async function withRoomsCount(building) {
+    return building ? { ...building, roomsCount: await countRooms(building.id) } : null;
+  }
+
   return {
     async findAll() {
-      return buildings;
+      return Promise.all(buildings.map(withRoomsCount));
     },
 
     async findById(id) {
-      return buildings.find(b => b.id === id) ?? null;
+      return withRoomsCount(buildings.find(b => b.id === id));
     },
 
     async create({ name, address }) {
@@ -25,7 +30,7 @@ function createBuildingsRepository(seed = DEFAULT_BUILDINGS) {
       }
       const building = { id: nextId++, name, address, createdAt: new Date() };
       buildings.push(building);
-      return building;
+      return withRoomsCount(building);
     }
   };
 }

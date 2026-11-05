@@ -20,33 +20,42 @@ function defaultReservations() {
   ];
 }
 
-function createReservationsRepository(seed = defaultReservations()) {
+// findRoom(id) - podawane przez unit of work, żeby zwracać rezerwację razem z salą i budynkiem
+function createReservationsRepository(seed = defaultReservations(), { findRoom = async () => null } = {}) {
   const reservations = structuredClone(seed);
   let nextReservationId = Math.max(0, ...reservations.map(r => r.id)) + 1;
 
+  async function withRoom(reservation) {
+    if (!reservation) return null;
+    const room = await findRoom(reservation.roomId);
+    return { ...reservation, room: room ? { id: room.id, name: room.name, building: room.building } : null };
+  }
+
   return {
     async findAll({ roomId } = {}) {
-      return reservations.filter(r => roomId === undefined || r.roomId === roomId);
+      return Promise.all(
+        reservations.filter(r => roomId === undefined || r.roomId === roomId).map(withRoom)
+      );
     },
 
     async findById(id) {
-      return reservations.find(r => r.id === id) ?? null;
+      return withRoom(reservations.find(r => r.id === id));
     },
 
     async findByRoomAndStatus(roomId, status) {
-      return reservations.filter(r => r.roomId === roomId && r.status === status);
+      return Promise.all(reservations.filter(r => r.roomId === roomId && r.status === status).map(withRoom));
     },
 
     async create(data) {
       const reservation = { id: nextReservationId++, ...data };
       reservations.push(reservation);
-      return reservation;
+      return withRoom(reservation);
     },
 
     async update(id, changes) {
       const reservation = reservations.find(r => r.id === id);
       Object.assign(reservation, changes);
-      return reservation;
+      return withRoom(reservation);
     }
   };
 }

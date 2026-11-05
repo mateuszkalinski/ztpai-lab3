@@ -103,3 +103,35 @@ Content-Type: application/json
 
 ### po restarcie servera - rezerwacja nadal jest
 GET {{baseUrl}}/reservations/7
+
+############################################
+# ZADANIE 3 - relacje i JOIN bez N+1
+############################################
+# Przed testami: npx knex seed:run
+
+### sala razem z budynkiem
+GET {{baseUrl}}/rooms/3
+
+### wszystkie sale z budynkami
+GET {{baseUrl}}/rooms
+
+### sale budynku A
+GET {{baseUrl}}/buildings/1/rooms
+
+### budynek bez sal -> []
+GET {{baseUrl}}/buildings/3/rooms
+
+### nieistniejący budynek -> 404
+GET {{baseUrl}}/buildings/999/rooms
+
+### budynki z liczbą sal (Budynek C -> roomsCount: 0)
+GET {{baseUrl}}/buildings
+
+### jeden budynek z liczbą sal
+GET {{baseUrl}}/buildings/2
+
+### rezerwacja z salą i budynkiem
+GET {{baseUrl}}/reservations/2
+
+### lista rezerwacji w tym samym formacie
+GET {{baseUrl}}/reservations

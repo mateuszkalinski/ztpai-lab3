@@ -18,7 +18,16 @@ function createBuildingsService({ runInTransaction }) {
     return runInTransaction(({ buildings }) => buildings.create(input));
   }
 
-  return { listBuildings, getBuilding, createBuilding };
+  async function listBuildingRooms(id) {
+    return runInTransaction(async ({ buildings, rooms }) => {
+      // nieistniejący budynek -> 404, budynek bez sal -> []
+      const building = await buildings.findById(id);
+      if (!building) throw new NotFoundError("Building");
+      return rooms.findByBuildingId(id);
+    });
+  }
+
+  return { listBuildings, getBuilding, createBuilding, listBuildingRooms };
 }
 
 module.exports = { createBuildingsService };
