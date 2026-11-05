@@ -20,8 +20,14 @@ function bodyError(field, message) {
 }
 
 function createReservationsService({ runInTransaction, now = () => new Date() }) {
-  async function listReservations({ roomId }) {
-    return runInTransaction(({ reservations }) => reservations.findAll({ roomId }));
+  async function listReservations(query) {
+    return runInTransaction(async ({ reservations }) => {
+      const { items, total } = await reservations.list(query);
+      return {
+        items,
+        meta: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) }
+      };
+    });
   }
 
   async function getReservation(id) {

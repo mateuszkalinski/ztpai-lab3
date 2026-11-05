@@ -10,6 +10,13 @@ const COLUMNS = {
   createdAt: "created_at"
 };
 
+// whitelist: wartość parametru sort -> kolumna w bazie (klient nigdy nie podaje nazwy kolumny)
+const SORT_COLUMNS = {
+  startTime: "res.start_time",
+  createdAt: "res.created_at",
+  participants: "res.participants"
+};
+
 function toRow(data) {
   const row = {};
   for (const [field, column] of Object.entries(COLUMNS)) {
@@ -52,13 +59,30 @@ function createReservationsRepository(db) {
   }
 
   return {
-    async findAll({ roomId } = {}) {
-      const rows = await reservationsWithRoom(db)
-        .modify(qb => {
-          if (roomId !== undefined) qb.where("res.room_id", roomId);
-        })
-        .orderBy("res.id");
-      return rows.map(toReservation);
+    async list({ roomId, buildingId, status, from, to, page, limit, sort }) {
+      // filtry - WHERE dokładany tylko wtedy, gdy parametr został podany
+      const filtered = reservationsWithRoom(db).modify(qb => {
+        if (roomId !== undefined) qb.where("res.room_id", roomId);
+        if (buildingId !== undefined) qb.where("r.building_id", buildingId);
+        if (status !== undefined) qb.where("res.status", status);
+        // nakładanie się przedziałów półotwartych [from, to): start < to AND end > from
+        if (to !== undefined) qb.where("res.start_time", "<", new Date(to));
+        if (from !== undefined) qb.where("res.end_time", ">", new Date(from));
+      });
+
+      const desc = sort.startsWith("-");
+      const column = SORT_COLUMNS[desc ? sort.slice(1) : sort];
+
+      const rows = await filtered.clone()
+        .orderBy(column, desc ? "desc" : "asc")
+        .orderBy("res.id", "asc") // tie-breaker - stabilna kolejność
+        .limit(limit)
+        .offset((page - 1) * limit);
+
+      // total z tymi samymi filtrami, ale bez LIMIT/OFFSET
+      const { count } = await filtered.clone().clearSelect().count({ count: "res.id" }).first();
+
+      return { items: rows.map(toReservation), total: Number(count) };
     },
 
     findById,

@@ -32,10 +32,26 @@ function createReservationsRepository(seed = defaultReservations(), { findRoom =
   }
 
   return {
-    async findAll({ roomId } = {}) {
-      return Promise.all(
-        reservations.filter(r => roomId === undefined || r.roomId === roomId).map(withRoom)
+    async list({ roomId, buildingId, status, from, to, page, limit, sort }) {
+      const all = await Promise.all(reservations.map(withRoom));
+      const fromMs = from && new Date(from).getTime();
+      const toMs = to && new Date(to).getTime();
+
+      const filtered = all.filter(r =>
+        (roomId === undefined || r.roomId === roomId) &&
+        (buildingId === undefined || r.room?.building?.id === buildingId) &&
+        (status === undefined || r.status === status) &&
+        (to === undefined || new Date(r.startTime).getTime() < toMs) &&
+        (from === undefined || new Date(r.endTime).getTime() > fromMs)
       );
+
+      const desc = sort.startsWith("-");
+      const field = desc ? sort.slice(1) : sort;
+      const value = r => (field === "participants" ? r.participants : new Date(r[field]).getTime());
+      filtered.sort((a, b) => (desc ? value(b) - value(a) : value(a) - value(b)) || a.id - b.id);
+
+      const start = (page - 1) * limit;
+      return { items: filtered.slice(start, start + limit), total: filtered.length };
     },
 
     async findById(id) {

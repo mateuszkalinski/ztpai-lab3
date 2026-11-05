@@ -135,3 +135,54 @@ GET {{baseUrl}}/reservations/2
 
 ### lista rezerwacji w tym samym formacie
 GET {{baseUrl}}/reservations
+
+############################################
+# ZADANIE 4 - pagination, filtrowanie, sortowanie
+############################################
+# Przed testami: node scripts/set-reservations.js 20
+# (seed + 14 dodatkowych rezerwacji = 20)
+
+### 1. domyślnie: page=1, limit=20, sort=startTime
+GET {{baseUrl}}/reservations
+
+### 2. sala 1, tylko CONFIRMED, od najpóźniejszej
+GET {{baseUrl}}/reservations?roomId=1&status=CONFIRMED&sort=-startTime
+
+### 3. budynek B, strona 2 po 3 rezerwacje
+GET {{baseUrl}}/reservations?buildingId=2&page=2&limit=3
+
+### 4. najwięcej uczestników na górze, strona 2 po 5
+GET {{baseUrl}}/reservations?sort=-participants&limit=5&page=2
+
+### 5. tylko anulowane, sortowanie po dacie utworzenia
+GET {{baseUrl}}/reservations?status=CANCELLED&sort=createdAt
+
+### 6a. rezerwacja 10:00-12:00 do testu przedziałów -> 201
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 3,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 15,
+  "startTime": "2026-12-15T10:00:00Z",
+  "endTime": "2026-12-15T12:00:00Z"
+}
+
+### 6b. from=11:00 to=11:30 -> rezerwacja 10:00-12:00 jest widoczna (nakłada się)
+GET {{baseUrl}}/reservations?roomId=3&from=2026-12-15T11:00:00Z&to=2026-12-15T11:30:00Z
+
+### 6c. from=12:00 to=13:00 -> pusto (tylko się styka, [from, to) półotwarty)
+GET {{baseUrl}}/reservations?roomId=3&from=2026-12-15T12:00:00Z&to=2026-12-15T13:00:00Z
+
+### 7. strona poza zakresem -> 200 i pusta tablica data
+GET {{baseUrl}}/reservations?page=99
+
+### 8. from >= to -> 400
+GET {{baseUrl}}/reservations?from=2026-12-15T12:00:00Z&to=2026-12-15T10:00:00Z
+
+### 9. nieznane sortowanie -> 400 (whitelista)
+GET {{baseUrl}}/reservations?sort=reservedBy
+
+### 10. limit ponad 100 -> 400
+GET {{baseUrl}}/reservations?limit=500
