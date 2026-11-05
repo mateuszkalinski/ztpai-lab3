@@ -27,6 +27,9 @@ function createRoomsRepository(seed = DEFAULT_ROOMS, { findBuilding = async () =
       return withBuilding(rooms.find(room => room.id === id));
     },
 
+    // w pamięci nie ma równoległych transakcji - blokada niepotrzebna (ten sam interfejs co Knex)
+    async lockById() {},
+
     async findByBuildingId(buildingId) {
       return Promise.all(rooms.filter(r => r.buildingId === buildingId).map(withBuilding));
     },

@@ -67,14 +67,26 @@ function createReservationsService({ runInTransaction, now = () => new Date() })
         throw new ConflictError("Przekroczono pojemnosc sali", "ROOM_CAPACITY_EXCEEDED");
       }
 
-      // brak nakładających się aktywnych rezerwacji -> 409
-      const active = await reservations.findByRoomAndStatus(room.id, "CONFIRMED");
-      const collision = active.some(r =>
-        overlaps(start, end, new Date(r.startTime).getTime(), new Date(r.endTime).getTime())
-      );
-      if (collision) {
-        throw new ConflictError("Sala jest juz zarezerwowana w tym czasie", "ROOM_ALREADY_BOOKED");
+      // TYLKO DO DEMONSTRACJI (zadanie 5): DEMO_SKIP_APP_CHECK=1 wyłącza blokadę i sprawdzenie
+      // w aplikacji, żeby pokazać, że exclusion constraint w bazie sam blokuje duplikaty
+      if (!process.env.DEMO_SKIP_APP_CHECK) {
+        // blokujemy wiersz sali: równoległe rezerwacje TEJ SAMEJ sali czekają tu w kolejce,
+        // aż poprzednia transakcja zrobi COMMIT - dopiero wtedy sprawdzają kolizje
+        await rooms.lockById(room.id);
+
+        // brak nakładających się aktywnych rezerwacji -> 409
+        const active = await reservations.findByRoomAndStatus(room.id, "CONFIRMED");
+        const collision = active.some(r =>
+          overlaps(start, end, new Date(r.startTime).getTime(), new Date(r.endTime).getTime())
+        );
+        if (collision) {
+          throw new ConflictError("Sala jest juz zarezerwowana w tym czasie", "ROOM_ALREADY_BOOKED");
+        }
       }
+
+      // TYLKO DO DEMONSTRACJI race condition (zadanie 5) - do usunięcia na koniec
+      const demoDelay = Number(process.env.DEMO_DELAY_MS ?? 0);
+      if (demoDelay > 0) await new Promise(resolve => setTimeout(resolve, demoDelay));
 
       return reservations.create({
         roomId: room.id,

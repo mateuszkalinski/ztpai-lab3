@@ -30,6 +30,11 @@ function createRoomsRepository(db) {
 
     findById,
 
+    // SELECT ... FOR UPDATE: blokada wiersza sali do końca transakcji (działa tylko wewnątrz trx)
+    async lockById(id) {
+      await db("rooms").where({ id }).forUpdate().first("id");
+    },
+
     async findByBuildingId(buildingId) {
       const rows = await roomsWithBuilding(db).where("r.building_id", buildingId).orderBy("r.id");
       return rows.map(toRoom);
