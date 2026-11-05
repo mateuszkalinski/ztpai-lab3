@@ -1,0 +1,327 @@
+@baseUrl = http://localhost:3000/api
+
+# Przed testami zrestartuj serwer i wysyłaj requesty po kolei od góry,
+# wtedy ID rezerwacji zgadzają się z komentarzami.
+# Rezerwacja o ID 1 jest w danych startowych (trwa teraz, sala 4).
+
+############################################
+# ZADANIE 1 - architektura (endpointy z lab1)
+############################################
+
+### [Z1] wszystkie sale
+GET {{baseUrl}}/rooms
+
+### [Z1] jedna sala
+GET {{baseUrl}}/rooms/1
+
+### [Z1] sala nie istnieje -> 404
+GET {{baseUrl}}/rooms/999
+
+### [Z1] nowa rezerwacja -> 201 (dostanie ID 2)
+POST {{baseUrltree src /F}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 20,
+  "startTime": "2026-11-10T10:00:00Z",
+  "endTime": "2026-11-10T12:00:00Z"
+}
+
+### [Z1] wszystkie rezerwacje
+GET {{baseUrl}}/reservations
+
+### [Z1] rezerwacje sali 1
+GET {{baseUrl}}/reservations?roomId=1
+
+### [Z1] rezerwacje sali 3 (pusta lista)
+GET {{baseUrl}}/reservations?roomId=3
+
+### [Z1] anulowanie rezerwacji 2 -> 200
+PATCH {{baseUrl}}/reservations/2/cancel
+
+### [Z1] anulowanie nieistniejącej -> 404
+PATCH {{baseUrl}}/reservations/999/cancel
+
+############################################
+# ZADANIE 2 - walidacja Zod
+############################################
+
+### kilka błędów naraz + nieznane pole -> 400
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": "1",
+  "reservedBy": "Al",
+  "participants": -5,
+  "startTime": "jutro",
+  "status": "CONFIRMED"
+}
+
+### id w URL nie jest liczbą -> 400 (a nie 404)
+GET {{baseUrl}}/rooms/abc
+
+### roomId w query nie jest liczbą -> 400
+GET {{baseUrl}}/reservations?roomId=abc
+
+### data bez strefy czasowej -> 400
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-10T10:00:00",
+  "endTime": "2026-11-10T12:00:00"
+}
+
+############################################
+# ZADANIE 3 - globalna obsługa błędów
+############################################
+
+### nieistniejąca ścieżka -> 404 w JSON
+GET {{baseUrl}}/nope
+
+### niepoprawny JSON -> 400 INVALID_JSON
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{"roomId": 1,}
+
+### nieoczekiwany błąd -> 500
+GET {{baseUrl}}/debug/crash
+
+### własny X-Request-Id
+GET {{baseUrl}}/rooms/1
+X-Request-Id: moj-test-lalalalal-202022021201
+
+############################################
+# ZADANIE 4 - brak nakładających się rezerwacji
+# istniejąca rezerwacja: sala 1, 12.11, 10:00-12:00
+############################################
+
+### rezerwacja 10:00-12:00 -> 201
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T10:00:00Z",
+  "endTime": "2026-11-12T12:00:00Z"
+}
+
+### 12:00-13:00 -> 201 (styka się, nie nakłada)
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T12:00:00Z",
+  "endTime": "2026-11-12T13:00:00Z"
+}
+
+### 08:00-10:00 -> 201 (styka się, nie nakłada)
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T08:00:00Z",
+  "endTime": "2026-11-12T10:00:00Z"
+}
+
+### 11:00-13:00 -> 409 (nakłada się)
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T11:00:00Z",
+  "endTime": "2026-11-12T13:00:00Z"
+}
+
+### 09:00-13:00 -> 409 (zawiera całą istniejącą)
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T09:00:00Z",
+  "endTime": "2026-11-12T13:00:00Z"
+}
+
+### 10:30-11:00 -> 409 (zawiera się w istniejącej)
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T10:30:00Z",
+  "endTime": "2026-11-12T11:00:00Z"
+}
+
+### 10:00-12:00 w innej sali -> 201
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T10:00:00Z",
+  "endTime": "2026-11-12T12:00:00Z"
+}
+
+### sala 3: rezerwacja 10:00-12:00 -> 201
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 3,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T10:00:00Z",
+  "endTime": "2026-11-12T12:00:00Z"
+}
+
+### sala 3: anulujemy rezerwację
+PATCH {{baseUrl}}/reservations/6/cancel
+
+### sala 3: znowu 10:00-12:00 -> 201 (anulowana nie blokuje)
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 3,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T10:00:00Z",
+  "endTime": "2026-11-12T12:00:00Z"
+}
+
+### inna strefa czasowa: 11:00+01:00 to 10:00Z -> 409
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-12T11:00:00+01:00",
+  "endTime": "2026-11-12T12:00:00+01:00"
+}
+
+### endTime przed startTime -> 400
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-13T12:00:00Z",
+  "endTime": "2026-11-13T10:00:00Z"
+}
+
+### krócej niż 15 minut -> 400
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-13T10:00:00Z",
+  "endTime": "2026-11-13T10:10:00Z"
+}
+
+### dłużej niż 8 godzin -> 400
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-13T08:00:00Z",
+  "endTime": "2026-11-13T17:00:00Z"
+}
+
+### startTime w przeszłości -> 400
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-01-10T10:00:00Z",
+  "endTime": "2026-01-10T12:00:00Z"
+}
+
+### za dużo osób (sala 1 ma 30 miejsc) -> 409
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 40,
+  "startTime": "2026-11-13T10:00:00Z",
+  "endTime": "2026-11-13T12:00:00Z"
+}
+
+### nieistniejąca sala -> 404
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 10,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 10,
+  "startTime": "2026-11-13T10:00:00Z",
+  "endTime": "2026-11-13T12:00:00Z"
+}
+
+############################################
+# ZADANIE 5 - anulowanie (state machine) + DTO
+############################################
+
+### przyszła rezerwacja -> 201 + nagłówek Location
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "reservedBy": "Emanuel Rybak",
+  "participants": 15,
+  "startTime": "2026-11-20T09:00:00Z",
+  "endTime": "2026-11-20T10:30:00Z"
+}
+
+### pobranie po adresie z Location
+GET {{baseUrl}}/reservations/8
+
+### anulowanie przyszłej rezerwacji -> 200, ustawione cancelledAt
+PATCH {{baseUrl}}/reservations/8/cancel
+
+### ponowne anulowanie -> 200, ten sam cancelledAt
+PATCH {{baseUrl}}/reservations/8/cancel
+
+### anulowanie rozpoczętej rezerwacji -> 409
+PATCH {{baseUrl}}/reservations/1/cancel
