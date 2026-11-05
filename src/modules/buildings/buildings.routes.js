@@ -1,0 +1,15 @@
+const { Router } = require("express");
+const validate = require("../../middleware/validate");
+const { buildingIdParams, createBuildingBody } = require("./buildings.schemas");
+
+function createBuildingsRouter(controller) {
+  const router = Router();
+
+  router.get("/", controller.list);
+  router.get("/:id", validate({ params: buildingIdParams }), controller.getById);
+  router.post("/", validate({ body: createBuildingBody }), controller.create);
+
+  return router;
+}
+
+module.exports = { createBuildingsRouter };

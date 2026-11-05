@@ -1,0 +1,105 @@
+@baseUrl = http://localhost:3000/api
+
+# Przed testami: npx knex seed:run  (ID zaczynają się od 1)
+# Seed: 3 budynki (C bez sal), 6 sal, 6 rezerwacji (1 trwa teraz, 1 anulowana)
+
+############################################
+# ZADANIE 2 - budynki i sale (Knex)
+############################################
+
+### wszystkie budynki
+GET {{baseUrl}}/buildings
+
+### jeden budynek
+GET {{baseUrl}}/buildings/1
+
+### budynek nie istnieje -> 404
+GET {{baseUrl}}/buildings/999
+
+### nowy budynek -> 201 (dostanie ID 4)
+POST {{baseUrl}}/buildings
+Content-Type: application/json
+
+{
+  "name": "Budynek D - Mechanika",
+  "address": "ul. Kampusowa 22, Kraków"
+}
+
+### duplikat nazwy budynku -> 409 UNIQUE_VIOLATION
+POST {{baseUrl}}/buildings
+Content-Type: application/json
+
+{
+  "name": "Budynek A - Informatyka",
+  "address": "ul. Lea 114, Kraków"
+}
+
+### budynek - błędy walidacji -> 400
+POST {{baseUrl}}/buildings
+Content-Type: application/json
+
+{
+  "name": "X",
+  "city": "Kraków"
+}
+
+### nowa sala w budynku C -> 201
+POST {{baseUrl}}/rooms
+Content-Type: application/json
+
+{
+  "buildingId": 3,
+  "name": "C001",
+  "capacity": 25
+}
+
+### sala w nieistniejącym budynku -> 404
+POST {{baseUrl}}/rooms
+Content-Type: application/json
+
+{
+  "buildingId": 999,
+  "name": "X001",
+  "capacity": 25
+}
+
+### duplikat nazwy sali w tym samym budynku -> 409
+POST {{baseUrl}}/rooms
+Content-Type: application/json
+
+{
+  "buildingId": 1,
+  "name": "A101",
+  "capacity": 20
+}
+
+### ta sama nazwa w innym budynku -> 201
+POST {{baseUrl}}/rooms
+Content-Type: application/json
+
+{
+  "buildingId": 2,
+  "name": "A101",
+  "capacity": 20
+}
+
+### wszystkie sale
+GET {{baseUrl}}/rooms
+
+### wszystkie rezerwacje
+GET {{baseUrl}}/reservations
+
+### nowa rezerwacja -> 201 (do sprawdzenia, czy przetrwa restart)
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "roomId": 3,
+  "reservedBy": "Mateusz Kaliński",
+  "participants": 20,
+  "startTime": "2026-12-10T09:00:00+01:00",
+  "endTime": "2026-12-10T10:30:00+01:00"
+}
+
+### po restarcie servera - rezerwacja nadal jest
+GET {{baseUrl}}/reservations/7

@@ -1,13 +1,24 @@
 const { createApp } = require("./app");
-const { createRoomsRepository } = require("./modules/rooms/rooms.repository.memory");
-const { createReservationsRepository } = require("./modules/reservations/reservations.repository.memory");
 
-const roomsRepository = createRoomsRepository();
-const reservationsRepository = createReservationsRepository();
+// JEDYNE miejsce wyboru implementacji repositories:
+//   domyślnie PostgreSQL (Knex), REPOSITORY=memory -> tablice w pamięci
+function createUnitOfWork() {
+  if (process.env.REPOSITORY === "memory") {
+    const { createMemoryUnitOfWork } = require("./db/unitOfWork.memory");
+    console.log("Repositories: in-memory");
+    return createMemoryUnitOfWork();
+  }
+
+  const db = require("./db/knex");
+  const { createKnexUnitOfWork } = require("./db/unitOfWork.knex");
+  console.log("Repositories: PostgreSQL (Knex)");
+  return createKnexUnitOfWork(db);
+}
+
+const { runInTransaction } = createUnitOfWork();
 
 const app = createApp({
-  roomsRepository,
-  reservationsRepository,
+  runInTransaction,
   now: () => new Date()
 });
 
